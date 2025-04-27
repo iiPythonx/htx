@@ -5,6 +5,7 @@ import re
 import typing
 import asyncio
 from enum import Enum
+from http import HTTPStatus
 from dataclasses import dataclass
 
 from htx import __version__
@@ -25,9 +26,9 @@ class ReadMode(Enum):
 
 @dataclass
 class Response:
-    code: int
+    code: HTTPStatus | int
     body: bytes
-    head: dict[str, str]
+    head: dict[str, str] = {}
 
 @dataclass
 class Request:
@@ -141,7 +142,10 @@ class Host:
                 break
 
         if response:
-            write.write(self._dump_response(response))
+            if not isinstance(response, (Response, bytes)):
+                raise ValueError("Returned value must be either a :Response: object or bytes!")
+
+            write.write(self._dump_response(response) if isinstance(response, Response) else response)
             await write.drain()
 
         write.close()
