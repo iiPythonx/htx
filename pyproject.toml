@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "htx"
+dynamic = ["version"]
+description = ""
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "lupa>=2.4",
+]
+
+[project.scripts]
+htx = "htx.__main__:main"
+
+[tool.hatch.version]
+path = "htx/__init__.py"
