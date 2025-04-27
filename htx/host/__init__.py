@@ -37,6 +37,7 @@ class Request:
     version: str
     headers: dict[str, str]
     body:    bytes
+    client:  tuple[str, int]
 
 class IncomingRequest:
     def __init__(self) -> None:
@@ -50,7 +51,6 @@ class IncomingRequest:
     def build(self) -> None:
         self.body = self.buffer
         self.mode = ReadMode.REQUEST_DONE
-        print("\n\t* [HTTP] Request read completed!")
 
     def process_chunks(self, chunks: list[bytes]) -> None:
         http_match = HTTP_PROTOCOL.match(chunks[0])
@@ -75,7 +75,6 @@ class IncomingRequest:
         buffer_size = len(self.buffer)
 
         # Check for end of HTTP headers
-        print(f"\t* [Chunk]: {chunk}{' ' * (20 - (len(chunk) + 2))}\t| Mode: {self.mode}")
         if b"\r\n\r\n" in self.buffer and self.mode == ReadMode.INCOMING_HEADERS:
             http_section, request_body = self.buffer.split(b"\r\n\r\n")
             self.process_chunks(http_section.split(b"\r\n"))
@@ -97,11 +96,12 @@ class IncomingRequest:
             if buffer_size == content_length:
                 return self.build()
 
-    def dump(self) -> Request:
+    def dump(self, peer: tuple[str]) -> Request:
         return Request(
             *self.protocol,  # type: ignore
             self.headers,    # type: ignore
-            self.body        # type: ignore
+            self.body,       # type: ignore
+            peer[:2]         # type: ignore
         )
 
 # Main handling
@@ -123,9 +123,6 @@ class Host:
         ])
 
     async def _handle_client(self, read: asyncio.StreamReader, write: asyncio.StreamWriter) -> None:
-        # print(f"[Incoming Connection] Connected from {':'.join(str(_) for _ in write.get_extra_info('peername')[:2])}")
-
-        # Read HTTP request
         request = IncomingRequest()
         while True:
             result = await read.read(20)
@@ -137,7 +134,7 @@ class Host:
                 break
 
         # Broadcast event
-        response, request = None, request.dump()
+        response, request = None, request.dump(write.get_extra_info("peername"))
         for listener in self.events.get("request", []):
             response = await listener(request)  # First come, first server
             if response is not None:
