@@ -6,9 +6,11 @@ import typing
 import asyncio
 from enum import Enum
 from http import HTTPStatus
+from time import perf_counter
 from dataclasses import dataclass
 
 from htx import __version__
+from htx.host.useragent import clean_useragent
 
 # Exceptions
 class InvalidRequest(Exception):
@@ -24,11 +26,9 @@ class ReadMode(Enum):
     INCOMING_BODY    = 2
     REQUEST_DONE     = 3
 
-@dataclass
 class Response:
-    code: HTTPStatus | int
-    body: bytes
-    head: dict[str, str] = {}
+    def __init__(self, code: HTTPStatus | int, body: bytes, head: dict[str, str] = {}) -> None:
+        self.code, self.body, self.head = code, body, head
 
 @dataclass
 class Request:
@@ -39,6 +39,20 @@ class Request:
     headers: dict[str, str]
     body:    bytes
     client:  tuple[str, int]
+
+    def log(self) -> typing.Callable:
+        start = perf_counter()
+        def end_log(status_code: int | None) -> None:
+            path = f"{self.path}{self.query}"
+            path = path[:50] + "..." if len(path) > 50 else path
+            path += (" " * (53 - len(path)))
+
+            code = f"\033[3{1 if status_code > 400 else 2}m{status_code}" if isinstance(status_code, int) else "\033[90m---"
+            user_agent = clean_useragent(self.headers.get("user-agent", "unknown"))
+
+            print(f"\033[90m[ {self.client[0]} ] \033[34m{self.method} {path} {code} \033[90m({user_agent}, \033[34m{round((perf_counter() - start) * 1000, 1)}ms\033[90m)")
+
+        return end_log
 
 class IncomingRequest:
     def __init__(self) -> None:
@@ -136,6 +150,8 @@ class Host:
 
         # Broadcast event
         response, request = None, request.dump(write.get_extra_info("peername"))
+
+        log = request.log()
         for listener in self.events.get("request", []):
             response = await listener(request)  # First come, first server
             if response is not None:
@@ -145,6 +161,7 @@ class Host:
             if not isinstance(response, (Response, bytes)):
                 raise ValueError("Returned value must be either a :Response: object or bytes!")
 
+            log(response.code if isinstance(response, Response) else None)
             write.write(self._dump_response(response) if isinstance(response, Response) else response)
             await write.drain()
 
