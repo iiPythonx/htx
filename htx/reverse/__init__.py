@@ -3,25 +3,23 @@
 # Modules
 from pathlib import Path
 from http import HTTPStatus
-from urllib.request import urlopen, Request
+from urllib.request import urlopen, Request as HTTPRequest
 from urllib.error import HTTPError, URLError
 
-from htx import __version__
-from htx.host import Response
+from htx.host import Request, Response
 
 # Main class
 class ReverseProxy:
     def __init__(self) -> None:
         self.error_page = (Path(__file__).parents[1] / "host/templates/error.html").read_text()
 
-    async def request(self, url: str) -> Response:
-        request = Request(url, headers = {"User-Agent": f"htx/{__version__} (https://github.com/iiPythonx/htx; ben@iipython.dev)"})
+    async def request(self, base_url: str, request: Request) -> Response:
         try:
-            with urlopen(request) as response:
-                return Response(response.status, response.read())
+            with urlopen(HTTPRequest(f"{base_url}{request.path}", headers = request.headers, data = request.body, method = request.method)) as response:
+                return Response(response.status, response.read(), {n: v for n, v in response.getheaders()})
 
         except HTTPError as e:
-            return Response(e.code, e.read())
+            return Response(e.code, e.read(), {n: v for n, v in e.headers.items()})
 
         except URLError as e:
             return Response(

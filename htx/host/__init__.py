@@ -50,7 +50,7 @@ class Request:
             code = f"\033[3{1 if status_code > 400 else 2}m{status_code}" if isinstance(status_code, int) else "\033[90m---"
             user_agent = clean_useragent(self.headers.get("user-agent", "unknown"))
 
-            print(f"\033[90m[ {self.client[0]} ] \033[34m{self.method} {path} {code} \033[90m({user_agent}, \033[34m{round((perf_counter() - start) * 1000, 1)}ms\033[90m)")
+            print(f"\033[90m[ {self.client[0]} ] \033[34m{self.method} {path} {code} \033[90m({user_agent}, \033[34m{round((perf_counter() - start) * 1000, 1)}ms\033[90m)\033[0m")
 
         return end_log
 
@@ -126,10 +126,10 @@ class Host:
 
     @staticmethod
     def _dump_response(response: Response) -> bytes:
-        response.head |= {
-            "Connection": "close",
-            "Content-Length": str(len(response.body)),
-            "Server": f"htx/{__version__}"
+        response.head = {k.lower(): v for k, v in response.head.items()} | {
+            "connection": "close",
+            "content-length": str(len(response.body)),
+            "server": f"htx/{__version__}"
         }
         return b"\r\n".join([
             f"HTTP/1.1 {response.code}".encode(),
