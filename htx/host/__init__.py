@@ -7,6 +7,7 @@ import asyncio
 from enum import Enum
 from http import HTTPStatus
 from time import perf_counter
+from urllib.parse import unquote
 from dataclasses import dataclass
 
 from htx import __version__
@@ -17,7 +18,7 @@ class InvalidRequest(Exception):
     pass
 
 # Expressions
-HTTP_PROTOCOL = re.compile(rb"(GET|POST|PATCH|DELETE|PUT|TRACE) (\/(?:[\w_.%/]+)?)(\?[\w\d\%\&\=]+)? HTTP\/(\d(?:.{2,3})?)")
+HTTP_PROTOCOL = re.compile(rb"(GET|POST|PATCH|DELETE|PUT|TRACE) (\/(?:[^?]+)?)(\?[\w\d\%\&\=]+)? HTTP\/(\d(?:.{2,3})?)")
 HTTP_HEADER   = re.compile(rb"([\w-]+): (.+)")
 
 # Typing
@@ -72,7 +73,7 @@ class IncomingRequest:
         if http_match is None:
             raise InvalidRequest
 
-        self.protocol = [(piece or b"").decode() for piece in http_match.groups()]
+        self.protocol = [unquote((piece or b"").decode()) for piece in http_match.groups()]
 
         # Process headers
         for chunk in chunks[1:]:

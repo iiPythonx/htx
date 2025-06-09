@@ -1,9 +1,14 @@
 # Copyright (c) 2025 iiPython
 
 # Modules
+import sys
 import asyncio
-from htx.routing import scaffold_app
+import importlib
+
+from htx.host import Host
 
 # Initialization
 def main() -> None:
-    asyncio.run(scaffold_app("localhost", 8000))
+    backend = Host()
+    importlib.import_module(sys.argv[1]).scaffold_app(backend, sys.argv[2:])
+    asyncio.run(backend.start("127.0.0.1", 8000))
