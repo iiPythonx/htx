@@ -2,7 +2,7 @@
 
 ![HTX Logo](.github/htx.png)
 
-A built from scratch Python HTTP server and reverse proxy.
+A built from scratch Python HTTP server with custom apps.
 
 </div>
 

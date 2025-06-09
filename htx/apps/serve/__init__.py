@@ -1,20 +1,45 @@
+# Copyright (c) 2025 iiPython
+
+# Metadata
+__requires__ = ["natsort>=8.4.0"]
+
 # Modules
 import stat
+import argparse
 import mimetypes
 from pathlib import Path
+
+from natsort import natsorted  # pyright: ignore
 
 from htx import __version__
 from htx.templating import Templating
 from htx.host import Host, Request, Response
 
-# Application setup
-def scaffold_app(backend: Host, args: list[str]) -> None:
-    if not args:
-        exit("usage: htx.serve [path]")
+# Handle byte suffixes
+def cleanup(num: int | float) -> str:
+    unit = ""
+    for unit in ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]:
+        if num < 1000 - 0.5:
+            break
 
-    path = Path(args[0])
+        if unit != "YB":
+            num /= 1000
+
+    return "{:.0f}{}".format(num, unit)
+
+# Application setup
+def scaffold_app(backend: Host, cmd: list[str]) -> None:
+
+    # Parse arguments
+    p = argparse.ArgumentParser(prog = "htx.apps.serve", add_help = False)
+    p.add_argument("path")
+    args, _ = p.parse_known_args(cmd)
+
+    # Setup templating
+    path = Path(args.path)
     templates = Templating(__file__)
 
+    # Request handling
     @backend.event("request")
     async def on_request(request: Request) ->  Response:
         target = path / request.path[1:]
@@ -25,13 +50,17 @@ def scaffold_app(backend: Host, args: list[str]) -> None:
             directories, files = [], []
             for item in target.iterdir():
                 file = item.stat()
-                (directories if item.is_dir() else files).append((item.name, f"<tr><td>{file.st_size if item.is_file() else 0}</td><td><a href = \"/{item.relative_to(path)}\">{item.name}</a></td><td>{stat.filemode(file.st_mode)}</td></tr>"))
+                (directories if item.is_dir() else files).append((item.name, f"<tr><td>{cleanup(file.st_size) if item.is_file() else 0}</td><td><a href = \"/{item.relative_to(path)}\">{item.name}</a></td><td>{stat.filemode(file.st_mode)}</td></tr>"))
+
+            html = ""
+            for item in [directories, files]:
+                html += "".join(_[1] for _ in natsorted(item, key = lambda _: _[0]))
 
             return Response(
-                404,
+                200,
                 templates.fetch(
                     "listing",
-                    content = "".join(_[1] for _ in sorted(directories, key = lambda _: _[0])) + "".join(_[1] for _ in sorted(files, key = lambda _: _[0])),
+                    content = html,
                     version = __version__,
                     current = str(target.relative_to(path)) if target != path else ""
                 )
