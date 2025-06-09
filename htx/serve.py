@@ -59,7 +59,10 @@ HTML_TEMPLATE = """\
                 <th><div>name</div></th>
                 <th><div>perm</div></th>
             </thead>
-            <tbody>{content}</tbody>
+            <tbody>
+                <tr><td>0</td><td><a href = "..">..</a></td><td>dr-xr-xr-x</td></tr>
+                {content}
+            </tbody>
         </table>
         <hr>
         <footer>
@@ -86,7 +89,7 @@ def scaffold_app(backend: Host, args: list[str]) -> None:
             directories, files = [], []
             for item in target.iterdir():
                 file = item.stat()
-                (directories if item.is_dir() else files).append((item.name, f"<tr><td>{file.st_size}</td><td><a href = \"/{item.relative_to(path)}\">{item.name}</a></td><td>{stat.filemode(file.st_mode)}</td></tr>"))
+                (directories if item.is_dir() else files).append((item.name, f"<tr><td>{file.st_size if item.is_file() else 0}</td><td><a href = \"/{item.relative_to(path)}\">{item.name}</a></td><td>{stat.filemode(file.st_mode)}</td></tr>"))
 
             return Response(
                 404,
