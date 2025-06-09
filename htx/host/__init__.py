@@ -11,7 +11,6 @@ from urllib.parse import unquote
 from dataclasses import dataclass
 
 from htx import __version__
-from htx.host.useragent import clean_useragent
 
 # Exceptions
 class InvalidRequest(Exception):
@@ -49,9 +48,8 @@ class Request:
             path += (" " * (53 - len(path)))
 
             code = f"\033[3{1 if status_code > 400 else 2}m{status_code}" if isinstance(status_code, int) else "\033[90m---"
-            user_agent = clean_useragent(self.headers.get("user-agent", "unknown"))
 
-            print(f"\033[90m[ {self.client[0]} ] \033[34m{self.method} {path} {code} \033[90m({user_agent}, \033[34m{round((perf_counter() - start) * 1000, 1)}ms\033[90m)\033[0m")
+            print(f"\033[90m[ {self.client[0]} ] \033[34m{self.method} {path} {code} \033[90m[\033[34m{round((perf_counter() - start) * 1000, 1)}ms\033[90m]\033[0m")
 
         return end_log
 
