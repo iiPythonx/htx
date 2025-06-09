@@ -12,8 +12,8 @@ from pathlib import Path
 from natsort import natsorted  # pyright: ignore
 
 from htx import __version__
-from htx.templating import Templating
 from htx.host import Host, Request, Response
+from htx.templates import Templating
 
 # Handle byte suffixes
 def cleanup(num: int | float) -> str:
@@ -37,7 +37,7 @@ def scaffold_app(backend: Host, cmd: list[str]) -> None:
 
     # Setup templating
     path = Path(args.path)
-    templates = Templating(__file__)
+    templates = Templating([Path(__file__).parent / "templates"])
 
     # Request handling
     @backend.event("request")

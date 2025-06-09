@@ -5,13 +5,13 @@ from http import HTTPStatus
 from urllib.request import urlopen, Request as HTTPRequest
 from urllib.error import HTTPError, URLError
 
-from htx.templating import Templating
 from htx.host import Request, Response
+from htx.templates import Templating
 
 # Main class
 class ReverseProxy:
     def __init__(self) -> None:
-        self.templating = Templating(__file__)
+        self.templating = Templating([])
 
     async def request(self, base_url: str, request: Request) -> Response:
         try:

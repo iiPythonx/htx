@@ -152,7 +152,7 @@ class Host:
 
         log = request.log()
         for listener in self.events.get("request", []):
-            response = await listener(request)  # First come, first server
+            response = await listener(request)  # First come, first serve
             if response is not None:
                 break
 
