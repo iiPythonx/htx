@@ -8,7 +8,7 @@ A built from scratch Python HTTP server with custom apps.
 
 ### Synopsis
 
-HTX is a zero-dependency HTTP server and reverse proxy built entirely from scratch as an experiment/proof of concept. It can act as a standalone HTTP server, giving low level access to the protocol, and also has reverse proxy functionality.
+HTX is a zero-dependency HTTP server built entirely from scratch as an experiment/proof of concept. It can act as a standalone HTTP server, giving low level access to the protocol, and also has the ability to load custom "ASGI" applications.
 
 ### Basic usage
 
@@ -34,23 +34,26 @@ asyncio.run(backend.start(host, port))
 
 The only current event is `request`; however, depending on whether SSL termination gets added there may be more down the road.
 
-#### Reverse Proxying
+#### Shell CLI
 
+HTX supports being given a Python module name and then loading it as a custom application. Some built-in apps include:
+- Reverse Proxying
+    - `htx htx.apps.reverse https://google.com`
+- File Listing
+    - `htx htx.apps.serve /etc/data`
+
+The basic structure of such an app should follow this design:
 ```py
-import asyncio
-from http import HTTPStatus
+from htx.host import Host, Request, Response
 
-from htx.host import Request
-from htx.reverse import ReverseProxy
+def scaffold_app(backend: Host, cmd: list[str]) -> None:
 
-async def main() -> None:
-    proxy = ReverseProxy()
-    print(await proxy.request("https://someserver.tld", Request<>))
-
-asyncio.run(main())
+    @backend.event("request")
+    async def on_request(request: Request) ->  Response:
+        return Response(200, b"OK")
 ```
 
-As of right now, the reverse proxy actively requires a `htx.host.Request` object to be passed to it, which is not ideal to create by hand. In the future, this API will be accessible outside of the standard HTTP scope.
+`cmd` is a list of command arguments, which can be passed to `argparse.ArgumentParser.parse_known_args`.
 
 ### Typing
 
