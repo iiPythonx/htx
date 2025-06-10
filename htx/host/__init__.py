@@ -16,9 +16,13 @@ from htx import __version__
 class InvalidRequest(Exception):
     pass
 
+class UnsupportedVersion(Exception):
+    pass
+
 # Expressions
 HTTP_PROTOCOL = re.compile(rb"(GET|POST|PATCH|DELETE|PUT|TRACE) (\/(?:[^?]+)?)(\?[\w\d\%\&\=]+)? HTTP\/(\d(?:.{2,3})?)")
 HTTP_HEADER   = re.compile(rb"([\w-]+): (.+)")
+PACKET_SIZE   = 1000  # Bytes
 
 # Typing
 class ReadMode(Enum):
@@ -48,7 +52,6 @@ class Request:
             path += (" " * (53 - len(path)))
 
             code = f"\033[3{1 if status_code > 400 else 2}m{status_code}" if isinstance(status_code, int) else "\033[90m---"
-
             print(f"\033[90m[ {self.client[0]} ] \033[34m{self.method} {path} {code} \033[90m[\033[34m{round((perf_counter() - start) * 1000, 1)}ms\033[90m]\033[0m")
 
         return end_log
@@ -59,6 +62,7 @@ class IncomingRequest:
         self.buffer: bytes = b""
 
         # Request data
+        self.body: bytes = b""
         self.protocol: list[str] = []
         self.headers: dict[str, str] = {}
 
@@ -69,15 +73,17 @@ class IncomingRequest:
     def process_chunks(self, chunks: list[bytes]) -> None:
         http_match = HTTP_PROTOCOL.match(chunks[0])
         if http_match is None:
-            raise InvalidRequest
+            raise InvalidRequest("No HTTP protocol header was found!")
 
         self.protocol = [unquote((piece or b"").decode()) for piece in http_match.groups()]
+        if self.protocol[3] != "1.1":
+            raise UnsupportedVersion
 
         # Process headers
         for chunk in chunks[1:]:
             header_match = HTTP_HEADER.match(chunk)
             if header_match is None:
-                raise InvalidRequest
+                raise InvalidRequest("Invalid (text-wise) HTTP header was found!")
 
             name, value = header_match.groups()
             self.headers[name.decode().lower()] = value.decode()
@@ -90,6 +96,10 @@ class IncomingRequest:
 
         # Check for end of HTTP headers
         if b"\r\n\r\n" in self.buffer and self.mode == ReadMode.INCOMING_HEADERS:
+            if self.buffer.startswith(b"PRI * HTTP/2.0"):
+                self.protocol = ["", "", "", ""]
+                raise UnsupportedVersion
+
             http_section, request_body = self.buffer.split(b"\r\n\r\n")
             self.process_chunks(http_section.split(b"\r\n"))
 
@@ -98,16 +108,23 @@ class IncomingRequest:
             if "content-length" not in self.headers:
                 return self.build()  # If this request has no Content-Length, assuming we're done after the headers
 
+            elif request_body:
+                self.mode = ReadMode.INCOMING_BODY
+                self.extend(b"")
+
         # Handle possible body (if there is one)
         elif self.mode == ReadMode.INCOMING_BODY:
             if buffer_size == 0:
                 return self.build()
 
             if not self.headers.get("content-length", "").isnumeric():
-                raise InvalidRequest
+                raise InvalidRequest("Sent value for Content-Length is non-numeric!")
 
             content_length = int(self.headers["content-length"])
-            if buffer_size == content_length:
+            if buffer_size > content_length:
+                raise InvalidRequest("Read buffer size exceeds what was specified in Content-Length!")
+
+            if buffer_size == content_length or buffer_size + PACKET_SIZE > content_length:
                 return self.build()
 
     def dump(self, peer: tuple[str]) -> Request:
@@ -137,24 +154,34 @@ class Host:
         ])
 
     async def _handle_client(self, read: asyncio.StreamReader, write: asyncio.StreamWriter) -> None:
-        request = IncomingRequest()
+        incoming, response = IncomingRequest(), None
         while True:
-            result = await read.read(20)
+            result = await read.read(PACKET_SIZE)
             if not result:
                 break
 
-            request.extend(result)
-            if request.mode == ReadMode.REQUEST_DONE:
+            try:
+                incoming.extend(result)
+                if incoming.mode == ReadMode.REQUEST_DONE:
+                    break
+
+            except InvalidRequest as e:
+                response = Response(HTTPStatus.BAD_REQUEST, f"HTX: Invalid request sent, more details: '{e}'".encode())
                 break
+
+            except UnsupportedVersion:
+                response = Response(HTTPStatus.HTTP_VERSION_NOT_SUPPORTED, b"")
+                break
+
+        request = incoming.dump(write.get_extra_info("peername"))
 
         # Broadcast event
-        response, request = None, request.dump(write.get_extra_info("peername"))
-
         log = request.log()
-        for listener in self.events.get("request", []):
-            response = await listener(request)  # First come, first serve
-            if response is not None:
-                break
+        if response is None:  # If we already have a response (client failure, then skip listeners)
+            for listener in self.events.get("request", []):
+                response = await listener(request)  # First come, first serve
+                if response is not None:
+                    break
 
         if response:
             if not isinstance(response, (Response, bytes)):
