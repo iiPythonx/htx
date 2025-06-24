@@ -26,7 +26,7 @@
                 display: flex;
                 justify-content: space-between;
             }
-            table, hr, footer {
+            main, hr, footer {
                 width: 600px;
                 border-bottom: 0px;
             }
@@ -37,20 +37,39 @@
             a:hover {
                 text-decoration: underline dotted;
             }
-            td {
-                white-space: nowrap;
+
+            /* Align the columns */
+            main {
+                display: flex;
+                gap: 5px;
+
+                /* Handle scrolling */
+                box-sizing: content-box;
+                margin-right: -17px;
+                overflow-x: hidden;
+                padding-right: 17px;
+                scrollbar-width: thin;
             }
-            td:first-child {
+            #listing {
+                max-height: 500px;
+            }
+
+            /* Handle styling the vertical columns */
+            section {
+                white-space: nowrap;
+                display: flex;
+                flex-direction: column;
+            }
+            #size {
                 min-width: 62px;
                 max-width: 62px;
             }
-            td:nth-child(2) {
+            #name {
                 text-overflow: ellipsis;
-                overflow: hidden;
                 min-width: 446px;
                 max-width: 446px;
             }
-            td:last-child {
+            #perm {
                 min-width: 86px;
                 max-width: 86px;
             }
@@ -59,17 +78,25 @@
         <title>HTX · File Listing</title>
     </head>
     <body>
-        <table>
-            <thead>
-                <th><div>size</div></th>
-                <th><div>name</div></th>
-                <th><div>perm</div></th>
-            </thead>
-            <tbody>
-                <tr><td>0</td><td><a href = "..">..</a></td><td>dr-xr-xr-x</td></tr>
-                %content
-            </tbody>
-        </table>
+        <main>
+            <div style = "width: 42px;">size</div>
+            <div style = "width: 426px;">name</div>
+            <div style = "width: 66px;">perm</div>
+        </main>
+        <main id = "listing">
+            <section id = "size">
+                <span>0</span>
+                %size
+            </section>
+            <section id = "name">
+                <span><a href = "..">..</a></span>
+                %name
+            </section>
+            <section id = "perm">
+                <span>dr-xr-xr-x</span>
+                %perm
+            </section>
+        </main>
         <hr>
         <footer>
             <span>HTX · v%version</span>

@@ -49,18 +49,29 @@ def scaffold_app(backend: Host, cmd: list[str]) -> None:
         if target.is_dir():
             directories, files = [], []
             for item in target.iterdir():
-                file = item.stat()
-                (directories if item.is_dir() else files).append((item.name, f"<tr><td>{cleanup(file.st_size) if item.is_file() else 0}</td><td><a href = \"/{item.relative_to(path)}\">{item.name}</a></td><td>{stat.filemode(file.st_mode)}</td></tr>"))
 
-            html = ""
-            for item in [directories, files]:
-                html += "".join(_[1] for _ in natsorted(item, key = lambda _: _[0]))
+                # Resolve any potential symlinks
+                item = item.resolve()
+                if not item.exists():
+                    continue  # And if it's a bad link, then ignore it
+
+                file = item.stat()
+                (directories if item.is_dir() else files).append((item.name, cleanup(file.st_size) if item.is_file() else 0, item.relative_to(path), stat.filemode(file.st_mode)))
+
+            size_html, name_html, perm_html = "", "", ""
+            for category in [directories, files]:
+                for name, size, relative, perm in natsorted(category, key = lambda _: _[0]):
+                    size_html += f"<span>{size}</span>"
+                    name_html += f"<span><a href = \"/{relative}\">{name}</a></span>"
+                    perm_html += f"<span>{perm}</span>"
 
             return Response(
                 200,
                 templates.fetch(
                     "listing",
-                    content = html,
+                    size = size_html,
+                    name = name_html,
+                    perm = perm_html,
                     version = __version__,
                     current = str(target.relative_to(path)) if target != path else ""
                 )
