@@ -48,7 +48,7 @@ def scaffold_app(backend: Host, cmd: list[str]) -> None:
             return Response(404, templates.fetch("error", title = "NOT FOUND", message = "Please check your URL and try again."))
 
         if target.is_dir():
-            modified_time = target.stat().st_mtime
+            modified_time = target.stat().st_ctime
             if target not in active_cache or active_cache[target]["modified"] != modified_time:
                 directories, files = [], []
                 for item in target.iterdir():
