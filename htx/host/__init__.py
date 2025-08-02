@@ -97,7 +97,7 @@ class IncomingRequest:
         # Check for end of HTTP headers
         if b"\r\n\r\n" in self.buffer and self.mode == ReadMode.INCOMING_HEADERS:
             if self.buffer.startswith(b"PRI * HTTP/2.0"):
-                self.protocol = ["", "", "", ""]
+                self.protocol = [""] * 4
                 raise UnsupportedVersion
 
             http_section, request_body = self.buffer.split(b"\r\n\r\n")
@@ -153,10 +153,10 @@ class Host:
             b"\r\n" + response.body
         ])
 
-    async def _handle_client(self, read: asyncio.StreamReader, write: asyncio.StreamWriter) -> None:
+    async def _handle_client(self, read_stream: asyncio.StreamReader, write_stream: asyncio.StreamWriter) -> None:
         incoming, response = IncomingRequest(), None
         while True:
-            result = await read.read(PACKET_SIZE)
+            result = await read_stream.read(PACKET_SIZE)
             if not result:
                 break
 
@@ -173,7 +173,7 @@ class Host:
                 response = Response(HTTPStatus.HTTP_VERSION_NOT_SUPPORTED, b"")
                 break
 
-        request = incoming.dump(write.get_extra_info("peername"))
+        request = incoming.dump(write_stream.get_extra_info("peername"))
 
         # Broadcast event
         log = request.log()
@@ -189,11 +189,11 @@ class Host:
                     raise ValueError("Returned value must be either a :Response: object or bytes!")
 
                 log(response.code if isinstance(response, Response) else None)
-                write.write(self._dump_response(response) if isinstance(response, Response) else response)
-                await write.drain()
+                write_stream.write(self._dump_response(response) if isinstance(response, Response) else response)
+                await write_stream.drain()
 
-            write.close()
-            await write.wait_closed()
+            write_stream.close()
+            await write_stream.wait_closed()
 
         except ConnectionError:
             pass
