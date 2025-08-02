@@ -26,7 +26,14 @@ def scaffold_app(backend: Host, cmd: list[str]) -> None:
         try:
             request.headers["host"] = args.upstream.split("://")[1].strip("/")
             with urlopen(HTTPRequest(f"{args.upstream}{request.path}", headers = request.headers, data = request.body, method = request.method)) as response:
-                return Response(response.status, response.read(), {n: v for n, v in response.getheaders()})
+                return Response(
+                    response.status,
+                    response.read(),
+                    {
+                        n: v
+                        for n, v in response.getheaders() if n.lower() != "transfer-encoding"
+                    }
+                )
 
         except HTTPError as e:
             return Response(e.code, e.read(), {n: v for n, v in e.headers.items()})

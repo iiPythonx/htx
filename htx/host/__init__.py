@@ -183,16 +183,20 @@ class Host:
                 if response is not None:
                     break
 
-        if response:
-            if not isinstance(response, (Response, bytes)):
-                raise ValueError("Returned value must be either a :Response: object or bytes!")
+        try:
+            if response:
+                if not isinstance(response, (Response, bytes)):
+                    raise ValueError("Returned value must be either a :Response: object or bytes!")
 
-            log(response.code if isinstance(response, Response) else None)
-            write.write(self._dump_response(response) if isinstance(response, Response) else response)
-            await write.drain()
+                log(response.code if isinstance(response, Response) else None)
+                write.write(self._dump_response(response) if isinstance(response, Response) else response)
+                await write.drain()
 
-        write.close()
-        await write.wait_closed()
+            write.close()
+            await write.wait_closed()
+
+        except ConnectionError:
+            pass
 
     async def start(self, host: str, port: int) -> None:
         """Start the HTTP backend, listening on the specified host and port."""
