@@ -79,6 +79,7 @@ def scaffold_app(backend: Host, cmd: list[str]) -> None:
                 templates.fetch(
                     "listing",
                     **active_cache[target]["data"],
+                    parent = f"/{target.parent.relative_to(path)}",
                     version = __version__,
                     current = str(target.relative_to(path)) if target != path else ""
                 )
